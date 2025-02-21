@@ -11,7 +11,11 @@ from io import BytesIO
 
 def search_and_download_images(query, num_images=2):
     options = webdriver.ChromeOptions()
+    options.add_argument('--headless')  # Run in headless mode
     options.add_argument('--start-maximized')
+    options.add_argument('--disable-gpu')  # Disable GPU acceleration (useful for headless mode)
+    options.add_argument('--no-sandbox')  # Bypass OS security model
+    options.add_argument('--disable-dev-shm-usage')  # Overcome limited resources in some environments
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
