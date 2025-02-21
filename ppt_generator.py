@@ -1,78 +1,98 @@
 from pptx import Presentation
-from pptx.util import Inches
+from pptx.util import Inches, Pt
+from pptx.enum.text import PP_ALIGN
+from pptx.dml.color import RGBColor
 
-def split_text_into_chunks(text, max_chars=400):
-    """Splits text into chunks of max_chars while keeping words intact."""
-    words = text.split()
-    chunks = []
-    chunk = ""
 
-    for word in words:
-        if len(chunk) + len(word) + 1 <= max_chars:
-            chunk += " " + word
-        else:
-            chunks.append(chunk.strip())
-            chunk = word
-    if chunk:
-        chunks.append(chunk.strip())
+def add_text_to_frame(text_frame, text):
+    """Formats text properly: bold for subheadings, italic for sub-subheadings, and avoids overflow."""
+    text_frame.clear()
+    text_frame.word_wrap = True
+    text_frame.margin_top = Inches(0.1)
+    text_frame.margin_bottom = Inches(0.1)
+    text_frame.margin_left = Inches(0.1)
+    text_frame.margin_right = Inches(0.1)
 
-    return chunks
+    # Splitting text into sections
+    lines = text.split("\n")
+    for line in lines:
+        if line.strip():
+            paragraph = text_frame.add_paragraph()
+            run = paragraph.add_run()
+            run.text = line.strip()
+            run.font.size = Pt(18)
 
-def format_text(text_frame, text):
-    """Formats the text inside the text box with bullet points and line breaks."""
-    text_frame.clear()  # Clear any default formatting
-    p = text_frame.add_paragraph()
+            # Formatting rules
+            if line.startswith("## "):  # Subheading
+                run.font.bold = True
+                run.text = line.replace("## ", "")  # Remove ##
+            elif line.startswith("### "):  # Sub-subheading
+                run.font.italic = True
+                run.text = line.replace("### ", "")  # Remove ###
 
-    # Split text into sentences and add bullet points
-    for line in text.split(". "):
-        line = line.strip()
-        if line:
-            p = text_frame.add_paragraph()
-            p.text = f"• {line}."
-            p.space_after = Inches(0.1)  # Reduce spacing between bullet points
 
-def create_presentation(topic, sections, slides_data, images_data):
+def modify_image_path(image_path, part_index):
+    """Replaces '1' with '2' in the image filename for continued slides."""
+    if part_index == 0:
+        return image_path
+    return image_path.replace("1", "2", 1)  # Replace first occurrence of '1' with '2'
+
+
+def create_presentation(topic, sections, slides_data, images_data, inverted_image_y_positions=None):
+    """Creates a PowerPoint presentation with alternating layouts and custom Y-axis for inverted images."""
     presentation = Presentation()
 
-    # Define text box dimensions (6 inches wide, 8 inches high)
-    text_left = Inches(0.5)
-    text_top = Inches(1.5)
-    text_width = Inches(6)   # Restored width to 6 inches
-    text_height = Inches(8)  # Increased height to 8 inches
+    # Define dimensions
+    text_top = Inches(2)
+    text_width = Inches(5)
+    text_height = Inches(6)
 
-    # Define image dimensions and placement
-    image_width = Inches(3)
+    # Define image size
+    image_width = Inches(3.5)
     image_height = Inches(3)
-    image_x = Inches(6.5)  # Top-right position
-    image_y = Inches(3.0)  # Image placed at y = 3.0
 
-    for section, (full_text, images) in zip(sections, zip(slides_data, images_data)):
-        text_chunks = split_text_into_chunks(full_text)  # Split text into manageable parts
+    # Default to an empty dictionary if no custom Y-values are provided
+    if inverted_image_y_positions is None:
+        inverted_image_y_positions = {}
 
-        for i, (text_chunk, img_path) in enumerate(zip(text_chunks, images)):
-            slide = presentation.slides.add_slide(presentation.slide_layouts[5])  # Title Only layout
+    for i, (section, (slide_text, images)) in enumerate(zip(sections, zip(slides_data, images_data))):
+        # Split long text into multiple slides
+        max_chars_per_slide = 350
+        text_parts = [slide_text[i:i + max_chars_per_slide] for i in range(0, len(slide_text), max_chars_per_slide)]
 
-            # Set title (same title for all slides in the section)
+        for part_index, text_part in enumerate(text_parts):
+            slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+
+            # Set title (Only for the first slide of the section)
             title_box = slide.shapes.title
             if title_box:
-                title_box.text = section  # No "Part 1" or "Part 2"
+                title_box.text = section if part_index == 0 else f"{section} (Cont.)"
 
-            # Add text box (6 inches wide, 8 inches high)
-            content_box = slide.shapes.add_textbox(text_left, text_top, text_width, text_height)
+            # Define positions based on layout
+            if i % 2 == 0:
+                # Original layout: text left, image right
+                text_x = Inches(0.5)
+                image_x = Inches(5.5)
+                image_y = Inches(2.5)  # Default position
+            else:
+                # Inverted layout: text right, image left
+                text_x = Inches(5)
+                image_x = Inches(1)
+
+                # Check for a manually defined Y-axis value
+                image_y = inverted_image_y_positions.get(i, Inches(2.5))  # Default to 4.0 if not specified
+
+            # Add text box
+            content_box = slide.shapes.add_textbox(text_x, text_top, text_width, text_height)
             content_frame = content_box.text_frame
-            content_frame.word_wrap = True
-            format_text(content_frame, text_chunk)  # Apply proper formatting
+            add_text_to_frame(content_frame, text_part)
 
-            # Set text box margins
-            content_frame.margin_top = Inches(0.2)
-            content_frame.margin_bottom = Inches(0.2)
-            content_frame.margin_left = Inches(0.3)
-            content_frame.margin_right = Inches(0.3)
+            # Add image on every slide of the section
+            if images:
+                image_filename = modify_image_path(images[0], part_index)  # Modify image path for continued slides
+                slide.shapes.add_picture(image_filename, image_x, image_y, image_width, image_height)
 
-            # Add image at (x=6.5, y=3.0)
-            slide.shapes.add_picture(img_path, image_x, image_y, image_width, image_height)
-
-    # Save the PowerPoint file
+    # Save the PowerPoint
     ppt_path = f"{topic.replace(' ', '_')}.pptx"
     presentation.save(ppt_path)
     return ppt_path
