@@ -10,7 +10,8 @@ def generate_text(topic, section):
     prompt = (
         f"Provide a comprehensive, detailed explanation about {topic} focusing on the section: '{section}'. "
         "Include relevant information, examples, and context. Provide content suitable for a presentation slide "
-        "and also a detailed lecture script."
+        "and also a detailed lecture script.do not start with i have i done this start directly from the topic begining and slides data should be properly arranged"
+        "donnot add slide 1 comprehensive type of heading just add some bullet point and dlittle details if required "
     )
 
     completion = client.chat.completions.create(
