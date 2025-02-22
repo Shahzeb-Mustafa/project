@@ -2,6 +2,35 @@ from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
 from pptx.dml.color import RGBColor
+import difflib
+from spellchecker import SpellChecker
+
+
+def correct_section_name(section, valid_sections):
+    """Corrects the section name based on predefined sections and valid sections."""
+    predefined_sections = {
+        "INTRODUCTION": "Introduction", "HISTORY": "History", "APPLICATIONS": "Applications",
+        "BENEFITS": "Benefits", "CHALLENGES": "Challenges", "INTRO": "Introduction", "STRY": "Story",
+        "STORY": "Story", "CONCLUSION": "Conclusion", "SUMMARY": "Summary", "OUTLINE": "Outline",
+        "METHODS": "Methods", "RESULTS": "Results", "DISCUSSION": "Discussion", "CONCLUSIONS": "Conclusions",
+        "REVIEW": "Review"
+    }
+
+    spell = SpellChecker()
+    section_corrected = spell.correction(section) or section  # Try to correct spelling
+    section_upper = section_corrected.upper()
+
+    # Check predefined sections first
+    if section_upper in predefined_sections:
+        return predefined_sections[section_upper].upper()
+
+    # Check against valid sections
+    valid_sections_upper = {s.upper(): s for s in valid_sections}
+    closest_match = difflib.get_close_matches(section_upper, valid_sections_upper.keys(), n=1, cutoff=0.6)
+    if closest_match:
+        return valid_sections_upper[closest_match[0]].upper()
+
+    return section_corrected.upper()
 
 
 def add_text_to_frame(text_frame, text):
@@ -31,13 +60,6 @@ def add_text_to_frame(text_frame, text):
                 run.text = line.replace("### ", "")  # Remove ###
 
 
-def modify_image_path(image_path, part_index):
-    """Replaces '1' with '2' in the image filename for continued slides."""
-    if part_index == 0:
-        return image_path
-    return image_path.replace("1", "2", 1)  # Replace first occurrence of '1' with '2'
-
-
 def create_presentation(topic, sections, slides_data, images_data, inverted_image_y_positions=None):
     """Creates a PowerPoint presentation with alternating layouts and custom Y-axis for inverted images."""
     presentation = Presentation()
@@ -56,8 +78,11 @@ def create_presentation(topic, sections, slides_data, images_data, inverted_imag
         inverted_image_y_positions = {}
 
     for i, (section, (slide_text, images)) in enumerate(zip(sections, zip(slides_data, images_data))):
+        # Correct section name
+        corrected_section = correct_section_name(section, sections).upper()
+
         # Split long text into multiple slides
-        max_chars_per_slide = 350
+        max_chars_per_slide = 550
         text_parts = [slide_text[i:i + max_chars_per_slide] for i in range(0, len(slide_text), max_chars_per_slide)]
 
         for part_index, text_part in enumerate(text_parts):
@@ -66,7 +91,7 @@ def create_presentation(topic, sections, slides_data, images_data, inverted_imag
             # Set title (Only for the first slide of the section)
             title_box = slide.shapes.title
             if title_box:
-                title_box.text = section if part_index == 0 else f"{section} (Cont.)"
+                title_box.text = corrected_section if part_index == 0 else f"{corrected_section} "
 
             # Define positions based on layout
             if i % 2 == 0:
@@ -78,8 +103,6 @@ def create_presentation(topic, sections, slides_data, images_data, inverted_imag
                 # Inverted layout: text right, image left
                 text_x = Inches(5)
                 image_x = Inches(1)
-
-                # Check for a manually defined Y-axis value
                 image_y = inverted_image_y_positions.get(i, Inches(2.5))  # Default to 4.0 if not specified
 
             # Add text box
@@ -89,7 +112,8 @@ def create_presentation(topic, sections, slides_data, images_data, inverted_imag
 
             # Add image on every slide of the section
             if images:
-                image_filename = modify_image_path(images[0], part_index)  # Modify image path for continued slides
+                image_index = part_index % len(images)  # Cycle through up to 5 images
+                image_filename = images[image_index]  # Select the appropriate image
                 slide.shapes.add_picture(image_filename, image_x, image_y, image_width, image_height)
 
     # Save the PowerPoint

@@ -1,23 +1,22 @@
 import concurrent.futures
-from text_generation import generate_text
+from slide_generator import generate_text as generate_slides
+from script_generator import generate_text as generate_script
 from image_scraper import search_and_download_images
 from ppt_generator import create_presentation
 from audio_generator import generate_audio_offline
 
-
 def process_section(topic, section):
-    """Parallel function to generate text and images."""
-    slide_text, lecture_text = generate_text(topic, section)
-    images = search_and_download_images(f"{topic} {section}", num_images=2)
+    slide_text = " ".join(generate_slides(topic, section))  # Combine tuple parts
+    lecture_text = " ".join(generate_script(topic, section))  # Combine tuple parts
+    images = search_and_download_images(f"{topic} {section}", num_images=5)
     return section, slide_text, lecture_text, images
-
 
 def main():
     topic = input("Enter a topic: ")
     sections_input = input("Enter sections separated by commas (e.g., Introduction, History, Applications): ")
     sections = [section.strip() for section in sections_input.split(',')]
 
-    print("\nStarting parallel processing for lecture script and image downloading...\n")
+    print("\nStarting parallel processing for lecture script, slide text, and image downloading...\n")
 
     slides_data = {}
     lecture_script = f"Lecture Script for Topic: {topic}\n\n"
@@ -48,6 +47,8 @@ def main():
         audio_future = executor.submit(generate_audio_offline, lecture_script, topic)
         audio_path = audio_future.result()
     print(f"Lecture audio saved as {audio_path}")
+    print("Slides Data:", slides_data)
+
 
 
 if __name__ == "__main__":

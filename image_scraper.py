@@ -9,7 +9,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from PIL import Image
 from io import BytesIO
 
-def search_and_download_images(query, num_images=2):
+def search_and_download_images(query, num_images=5):
     options = webdriver.ChromeOptions()
     options.add_argument('--headless')  # Run in headless mode
     options.add_argument('--start-maximized')
