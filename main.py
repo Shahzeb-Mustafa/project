@@ -4,14 +4,18 @@ from script_generator import generate_text as generate_script
 from image_scraper import search_and_download_images
 from ppt_generator import create_presentation
 from audio_generator import generate_audio_offline
+from section import correct_grammar
 
 def process_section(topic, section):
-    slide_text = " ".join(generate_slides(topic, section))  # Combine tuple parts
-    lecture_text = " ".join(generate_script(topic, section))  # Combine tuple parts
-    images = search_and_download_images(f"{topic} {section}", num_images=5)
-    return section, slide_text, lecture_text, images
+    """Processes a section by generating slide text, lecture text, and downloading images."""
+    corrected_section = correct_grammar(section)
+    slide_text = ", ".join(generate_slides(topic, corrected_section))  # Convert tuple to comma-separated string
+    lecture_text = ", ".join(generate_script(topic, corrected_section))  # Convert tuple to comma-separated string
+    images = search_and_download_images(f"{topic} {corrected_section}", num_images=5)
+    return corrected_section, slide_text, lecture_text, images
 
 def main():
+    """Main function to process user input and generate slides, scripts, images, and audio."""
     topic = input("Enter a topic: ")
     sections_input = input("Enter sections separated by commas (e.g., Introduction, History, Applications): ")
     sections = [section.strip() for section in sections_input.split(',')]
@@ -21,20 +25,21 @@ def main():
     slides_data = {}
     lecture_script = f"Lecture Script for Topic: {topic}\n\n"
     images_data = {}
+    corrected_sections = []
 
-    # Run text generation and image downloading in parallel
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_to_section = {executor.submit(process_section, topic, section): section for section in sections}
 
         for future in concurrent.futures.as_completed(future_to_section):
-            section, slide_text, lecture_text, images = future.result()
-            slides_data[section] = slide_text
-            lecture_script += f"### {section}\n{lecture_text}\n\n"
-            images_data[section] = images
+            corrected_section, slide_text, lecture_text, images = future.result()
+            slides_data[corrected_section] = slide_text
+            lecture_script += f"### {corrected_section}\n{lecture_text}\n\n"
+            images_data[corrected_section] = images
+            corrected_sections.append(corrected_section)
 
     print("\nCreating PowerPoint Presentation...\n")
-    ppt_path = create_presentation(topic, sections, [slides_data[sec] for sec in sections],
-                                   [images_data[sec] for sec in sections])
+    ppt_path = create_presentation(topic, corrected_sections, [slides_data[sec] for sec in corrected_sections],
+                                   [images_data[sec] for sec in corrected_sections])
     print(f"Presentation saved as {ppt_path}")
 
     script_path = f"{topic.replace(' ', '_')}_lecture_script.txt"
@@ -48,8 +53,6 @@ def main():
         audio_path = audio_future.result()
     print(f"Lecture audio saved as {audio_path}")
     print("Slides Data:", slides_data)
-
-
 
 if __name__ == "__main__":
     main()
