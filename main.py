@@ -3,17 +3,23 @@ from slide_generator import generate_text as generate_slides
 from script_generator import generate_text as generate_script
 from image_scraper import search_and_download_images
 from ppt_generator import create_presentation
-from audio_generator import generate_audio_offline
+from audio_generator import generate_audio
 from section import correct_grammar
+import re
+def clean_filename(filename):
+    """Removes invalid characters from a filename."""
+    return re.sub(r'[\\/*?:"<>|,]', '_', filename)
 
 def process_section(topic, section):
     """Processes a section by generating slide text, lecture text, and downloading images."""
-    corrected_section = correct_grammar(section)
-    slide_text = ", ".join(generate_slides(topic, corrected_section))  # Convert tuple to comma-separated string
-    lecture_text = ", ".join(generate_script(topic, corrected_section))  # Convert tuple to comma-separated string
-    images = search_and_download_images(f"{topic} {corrected_section}", num_images=5)
-    return corrected_section, slide_text, lecture_text, images
+    corrected_section = correct_grammar(section)  # Apply grammar correction
+    corrected_section = clean_filename(corrected_section)  # Clean filename for Windows
 
+    slide_text = ", ".join(generate_slides(topic, corrected_section))  # Convert tuple to string
+    lecture_text = ", ".join(generate_script(topic, corrected_section))  # Convert tuple to string
+    images = search_and_download_images(f"{topic} {corrected_section}", num_images=5)  # Safe name now
+
+    return corrected_section, slide_text, lecture_text, images
 def main():
     """Main function to process user input and generate slides, scripts, images, and audio."""
     topic = input("Enter a topic: ")
@@ -49,10 +55,17 @@ def main():
 
     print("\nGenerating lecture audio...\n")
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        audio_future = executor.submit(generate_audio_offline, lecture_script, topic)
+        audio_future = executor.submit(generate_audio, lecture_script, topic)
         audio_path = audio_future.result()
     print(f"Lecture audio saved as {audio_path}")
     print("Slides Data:", slides_data)
+
+    from video_generator import generate_lecture_video
+
+    print("\nGenerating lecture video...\n")
+    generate_lecture_video(ppt_path, audio_path)
+    print("Lecture video successfully generated!")
+
 
 if __name__ == "__main__":
     main()
